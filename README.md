@@ -71,12 +71,14 @@ benchmarks against the usual alternatives. The original is preserved under
 - `head` and `tail` padded onto separate cache lines to avoid false sharing.
 - Generic over any trivially copyable `T` (a C++20 concept enforces it).
 
-### `sw::JitterBuffer` (audio playout)  *(in progress)*
+### `sw::JitterBuffer` (audio playout)
 
 Wraps `SpscRingBuffer<int16_t>` and adds the audio timing brain: a prebuffer /
 warm-up gate so playback does not start dry, and a drift policy that watches the
-fill level and decides when to skip or hold a frame to keep the two clocks in
-step. Returns decisions; it does no logging or I/O on the hot path.
+fill level and decides when to skip a block (overflow) or serve silence
+(underrun) to keep the two clocks in step. The hot path does no logging or I/O,
+it *returns* a `PlaybackAction` (`Warmup` / `Normal` / `Skipped` / `Underrun`)
+so the caller can observe drift handling without touching the audio thread.
 
 ### `sw::RedundancyPacketizer` (network FEC)  *(planned)*
 
@@ -131,8 +133,8 @@ presets to run the suite under sanitizers.
 ## Status
 
 - [x] `SpscRingBuffer<T>` core with single-threaded test coverage
-- [ ] Two-thread stress test under ThreadSanitizer
-- [ ] `JitterBuffer` (prebuffer + drift)
+- [x] Two-thread stress test (run under the `tsan` preset in CI)
+- [x] `JitterBuffer` (prebuffer + drift)
 - [ ] `RedundancyPacketizer` (FEC)
 - [ ] Benchmarks vs mutex queue
 - [ ] CI matrix (gcc / clang / msvc) and sanitizer job

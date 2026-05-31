@@ -11,10 +11,15 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
 
 add_executable(sw_tests
-    test_spsc_basic.cpp)
+    test_spsc_basic.cpp
+    test_spsc_stress.cpp
+    test_jitter_buffer.cpp)
 target_link_libraries(sw_tests PRIVATE
     sw::ringbuffer
     sw_project_options
     Catch2::Catch2WithMain)
+
+find_package(Threads REQUIRED)
+target_link_libraries(sw_tests PRIVATE Threads::Threads)
 
 catch_discover_tests(sw_tests)
