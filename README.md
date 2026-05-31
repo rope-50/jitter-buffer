@@ -1,4 +1,4 @@
-# sw-ringbuffer
+# jitter-buffer
 
 [![CI](https://github.com/rope-50/jitter-buffer/actions/workflows/ci.yml/badge.svg)](https://github.com/rope-50/jitter-buffer/actions/workflows/ci.yml)
 
@@ -95,9 +95,9 @@ ctest --test-dir build -C Debug --output-on-failure
 The `asan` and `tsan` presets run the suite under sanitizers. Benchmarks:
 
 ```bash
-cmake -S . -B build -DSW_RINGBUFFER_BUILD_BENCHMARKS=ON
-cmake --build build --config Release --target sw_benchmarks
-./build/benchmarks/Release/sw_benchmarks
+cmake -S . -B build -DJITTER_BUFFER_BUILD_BENCHMARKS=ON
+cmake --build build --config Release --target jitter_benchmarks
+./build/benchmarks/Release/jitter_benchmarks
 ```
 
 ## Benchmarks

@@ -11,11 +11,11 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(benchmark)
 
-add_executable(sw_benchmarks bench_spsc.cpp)
-target_link_libraries(sw_benchmarks PRIVATE
-    sw::ringbuffer
-    sw_project_options
+add_executable(jitter_benchmarks bench_spsc.cpp)
+target_link_libraries(jitter_benchmarks PRIVATE
+    jitter::buffer
+    jitter_project_options
     benchmark::benchmark)
 
 find_package(Threads REQUIRED)
-target_link_libraries(sw_benchmarks PRIVATE Threads::Threads)
+target_link_libraries(jitter_benchmarks PRIVATE Threads::Threads)

@@ -7,7 +7,7 @@
       "displayName": "Windows MSVC (Visual Studio 2022)",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build",
-      "cacheVariables": { "SW_RINGBUFFER_BUILD_TESTS": "ON" }
+      "cacheVariables": { "JITTER_BUFFER_BUILD_TESTS": "ON" }
     },
     {
       "name": "ci-gcc",
@@ -17,7 +17,7 @@
       "cacheVariables": {
         "CMAKE_CXX_COMPILER": "g++",
         "CMAKE_BUILD_TYPE": "Debug",
-        "SW_RINGBUFFER_BUILD_TESTS": "ON"
+        "JITTER_BUFFER_BUILD_TESTS": "ON"
       }
     },
     {
@@ -28,7 +28,7 @@
       "cacheVariables": {
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_BUILD_TYPE": "Debug",
-        "SW_RINGBUFFER_BUILD_TESTS": "ON"
+        "JITTER_BUFFER_BUILD_TESTS": "ON"
       }
     },
     {
@@ -36,14 +36,14 @@
       "displayName": "Clang + Address/UB sanitizers",
       "inherits": "ci-clang",
       "binaryDir": "${sourceDir}/build/asan",
-      "cacheVariables": { "SW_RINGBUFFER_SANITIZER": "address;undefined" }
+      "cacheVariables": { "JITTER_BUFFER_SANITIZER": "address;undefined" }
     },
     {
       "name": "tsan",
       "displayName": "Clang + Thread sanitizer",
       "inherits": "ci-clang",
       "binaryDir": "${sourceDir}/build/tsan",
-      "cacheVariables": { "SW_RINGBUFFER_SANITIZER": "thread" }
+      "cacheVariables": { "JITTER_BUFFER_SANITIZER": "thread" }
     }
   ],
   "buildPresets": [
