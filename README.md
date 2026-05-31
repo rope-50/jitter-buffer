@@ -80,12 +80,14 @@ fill level and decides when to skip a block (overflow) or serve silence
 it *returns* a `PlaybackAction` (`Warmup` / `Normal` / `Skipped` / `Underrun`)
 so the caller can observe drift handling without touching the audio thread.
 
-### `sw::RedundancyPacketizer` (network FEC)  *(planned)*
+### `sw::RedundancyPacketizer` (network FEC)
 
 Packs each audio burst together with copies of the previous N bursts plus a
-sequence number, so a receiver can rebuild lost packets from redundant copies.
-Pure logic, no sockets, which keeps it deterministic and easy to test against
-simulated loss.
+sequence number, so a receiver (`sw::RedundancyDepacketizer`) can rebuild lost
+packets from redundant copies. A burst is only lost if `redundancy` packets in a
+row are dropped; an unrecoverable gap is emitted as silence so the stream stays
+positionally aligned. Pure logic, no sockets, which keeps it deterministic and
+easy to test against simulated loss and reordering.
 
 ## Usage
 
@@ -135,7 +137,7 @@ presets to run the suite under sanitizers.
 - [x] `SpscRingBuffer<T>` core with single-threaded test coverage
 - [x] Two-thread stress test (run under the `tsan` preset in CI)
 - [x] `JitterBuffer` (prebuffer + drift)
-- [ ] `RedundancyPacketizer` (FEC)
+- [x] `RedundancyPacketizer` (FEC) with loss/reorder recovery tests
 - [ ] Benchmarks vs mutex queue
 - [ ] CI matrix (gcc / clang / msvc) and sanitizer job
 

@@ -13,7 +13,8 @@ include(Catch)
 add_executable(sw_tests
     test_spsc_basic.cpp
     test_spsc_stress.cpp
-    test_jitter_buffer.cpp)
+    test_jitter_buffer.cpp
+    test_redundancy_packetizer.cpp)
 target_link_libraries(sw_tests PRIVATE
     sw::ringbuffer
     sw_project_options
