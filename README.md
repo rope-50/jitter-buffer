@@ -1,6 +1,6 @@
 # sw-ringbuffer
 
-[![CI](https://github.com/stagewave-rope/jitter-buffer/actions/workflows/ci.yml/badge.svg)](https://github.com/stagewave-rope/jitter-buffer/actions/workflows/ci.yml)
+[![CI](https://github.com/rope-50/jitter-buffer/actions/workflows/ci.yml/badge.svg)](https://github.com/rope-50/jitter-buffer/actions/workflows/ci.yml)
 
 Header-only C++20 building blocks for moving audio between threads and across a
 lossy network without glitches.
