@@ -132,13 +132,37 @@ ctest --test-dir build -C Debug --output-on-failure
 On Linux, swap the preset for `ci-gcc` or `ci-clang`, and use the `asan` / `tsan`
 presets to run the suite under sanitizers.
 
+To build and run the benchmarks:
+
+```bash
+cmake -S . -B build -DSW_RINGBUFFER_BUILD_BENCHMARKS=ON
+cmake --build build --config Release --target sw_benchmarks
+./build/benchmarks/Release/sw_benchmarks
+```
+
+## Benchmarks
+
+`SpscRingBuffer` versus a `std::mutex` + `std::queue` baseline. Numbers below are
+from one machine (16-core x86-64, MSVC Release) and are illustrative; run the
+suite on your own hardware. The point is the ratio, not the absolute figures.
+
+| Benchmark | `SpscRingBuffer` | Mutex queue | Speedup |
+|---|---|---|---|
+| Uncontended push + pop | 7.4 ns | 19.7 ns | ~2.7x |
+| 1M-item two-thread throughput | 2.6 ms | 37.2 ms | ~14x |
+
+The uncontended gap is the data-structure overhead alone (a masked index and two
+release/acquire stores versus a lock/unlock pair). The throughput gap is much
+larger because the mutex serializes the producer and consumer, while the
+lock-free buffer lets them run genuinely in parallel.
+
 ## Status
 
 - [x] `SpscRingBuffer<T>` core with single-threaded test coverage
 - [x] Two-thread stress test (run under the `tsan` preset in CI)
 - [x] `JitterBuffer` (prebuffer + drift)
 - [x] `RedundancyPacketizer` (FEC) with loss/reorder recovery tests
-- [ ] Benchmarks vs mutex queue
+- [x] Benchmarks vs mutex queue
 - [ ] CI matrix (gcc / clang / msvc) and sanitizer job
 
 ## License
