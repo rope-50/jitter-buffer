@@ -5,8 +5,6 @@
 Header-only C++20 building blocks for moving audio between threads and across a
 lossy network without glitches.
 
-The library is three focused layers that stack on top of each other:
-
 | Component | Role |
 |---|---|
 | `sw::SpscRingBuffer<T>` | Bounded, wait-free single-producer / single-consumer ring buffer. |
@@ -15,81 +13,49 @@ The library is three focused layers that stack on top of each other:
 
 ## Why this exists
 
-Real-time audio has a requirement that looks simple and is not: the thread that
-**fills** the audio and the thread that **drains** it run on two clocks that
-never agree, and the draining thread (the sound card callback) cannot be made to
-wait. The moment it blocks, allocates, or takes a lock, you hear a click or a
-dropout. So the structure that sits between producer and consumer has to satisfy
-three constraints at once:
+Real-time audio has to keep feeding the sound card on a deadline of a few
+milliseconds, and the callback that does it cannot block, allocate, or take a
+lock without causing an audible glitch. That makes three problems unavoidable,
+and a textbook ring buffer solves none of them:
 
-1. **Wait-free on the audio side.** No locks, no allocation, no system calls on
-   push or pop. The audio callback runs on a deadline measured in single-digit
-   milliseconds and missing it is audible.
+- **Two threads, no locks.** The producer and the consumer run concurrently and
+  must hand off audio without ever waiting on each other.
+- **Clocks that drift.** The input and output run on independent clocks that
+  slowly diverge, so something has to absorb the drift instead of starving or
+  overflowing.
+- **Packets that get lost.** Over UDP you cannot retransmit in time, so each
+  chunk of audio is sent redundantly and gaps are filled from copies that did
+  arrive.
 
-2. **Tolerant of mismatched rates.** The input clock (a microphone, a socket, a
-   mixer) and the output clock (the sound card) drift apart over minutes of
-   playback. Something has to absorb that drift on purpose, instead of letting
-   the buffer slowly starve into silence or overflow into garbage.
+Each problem gets its own small, tested component, and they compose.
 
-3. **Tolerant of packet loss.** When audio travels over UDP you cannot ask for a
-   lost packet again, the replacement would arrive too late to play. The only
-   defense that works in real time is to send each chunk of audio more than
-   once, so a gap can be filled from a copy that did arrive.
+## Components
 
-A textbook ring buffer solves none of these. It is either a single-threaded
-convenience or, at best, a generic lock-free queue with no idea that audio has
-timing or that a network drops data. This project takes the opposite stance:
-each of the three problems above gets its own small, tested component, and they
-compose.
-
-### Origin
-
-This started as one class, `SWRingBuffer`, living inside a production audio
-engine (`sw-audioengine`). That version shipped and worked, but over time it had
-absorbed three jobs into a single type: the ring itself, the audio timing logic,
-and a network redundancy packetizer. It also had several rough edges that are
-easy to miss until they bite, more than one thread advancing the same index, an
-ambiguous "is it full or empty" state, and `printf` calls on the audio thread.
-
-`sw-ringbuffer` is that idea extracted and rebuilt: split into clean layers,
-given a single writer per index, explicit and documented memory ordering,
-exhaustive tests (including a two-thread stress run under ThreadSanitizer), and
-benchmarks against the usual alternatives. The original is preserved under
-[`legacy/`](legacy/) so the before-and-after is visible in the git history and in
-[`DESIGN.md`](docs/DESIGN.md).
-
-## What you get
-
-### `sw::SpscRingBuffer<T>` (the core)
+### `sw::SpscRingBuffer<T>`
 
 - Wait-free `try_push` / `try_pop` and bulk `write` / `read`, none of which lock
   or allocate.
-- Exactly one writer per index: the producer owns `head`, the consumer owns
-  `tail`. Neither touches the other. This is what makes the lock-free reasoning
-  small enough to actually verify.
+- One writer per index: the producer owns `head`, the consumer owns `tail`.
 - Power-of-two capacity with monotonic counters, so "full" and "empty" are never
-  ambiguous and the entire capacity is usable.
-- `acquire` / `release` ordering that publishes the data before the index move.
-- `head` and `tail` padded onto separate cache lines to avoid false sharing.
-- Generic over any trivially copyable `T` (a C++20 concept enforces it).
+  ambiguous and the whole capacity is usable.
+- `acquire` / `release` ordering and cache-line padding to avoid false sharing.
+- Generic over any trivially copyable `T` (enforced by a C++20 concept).
 
-### `sw::JitterBuffer` (audio playout)
+### `sw::JitterBuffer`
 
-Wraps `SpscRingBuffer<int16_t>` and adds the audio timing brain: a prebuffer /
-warm-up gate so playback does not start dry, and a drift policy that watches the
-fill level and decides when to skip a block (overflow) or serve silence
-(underrun) to keep the two clocks in step. The hot path does no logging or I/O,
-it *returns* a `PlaybackAction` (`Warmup` / `Normal` / `Skipped` / `Underrun`)
-so the caller can observe drift handling without touching the audio thread.
+Wraps `SpscRingBuffer<int16_t>` with a warm-up gate so playback does not start
+dry, and a drift policy that skips a block on overflow or serves silence on
+underrun. The hot path does no I/O; it returns a `PlaybackAction`
+(`Warmup` / `Normal` / `Skipped` / `Underrun`) so the caller can observe drift
+handling without touching the audio thread.
 
-### `sw::RedundancyPacketizer` (network FEC)
+### `sw::RedundancyPacketizer`
 
-Packs each audio burst together with copies of the previous N bursts plus a
-sequence number, so a receiver (`sw::RedundancyDepacketizer`) can rebuild lost
-packets from redundant copies. A burst is only lost if `redundancy` packets in a
-row are dropped; an unrecoverable gap is emitted as silence so the stream stays
-positionally aligned. Pure logic, no sockets, which keeps it deterministic and
-easy to test against simulated loss and reordering.
+Packs each audio burst with copies of the previous N bursts plus a sequence
+number, so `sw::RedundancyDepacketizer` can rebuild lost packets from redundant
+copies. A burst is only lost if `redundancy` packets in a row are dropped; an
+unrecoverable gap is emitted as silence to keep the stream aligned. Pure logic,
+no sockets.
 
 ## Usage
 
@@ -99,8 +65,7 @@ easy to test against simulated loss and reordering.
 sw::SpscRingBuffer<float> rb(1024); // rounded up to a power of two
 
 // Producer thread
-float sample = 0.5f;
-if (!rb.try_push(sample)) {
+if (!rb.try_push(0.5f)) {
     // buffer full, apply your overflow policy
 }
 
@@ -112,29 +77,22 @@ if (rb.try_pop(out)) {
 
 // Bulk paths for block-based audio
 std::array<float, 256> block{ /* ... */ };
-std::size_t written = rb.write(block);     // returns how many fit
+std::size_t written = rb.write(block); // returns how many fit
 std::array<float, 256> dst{};
-std::size_t read = rb.read(dst);           // returns how many were available
+std::size_t read = rb.read(dst);       // returns how many were available
 ```
 
 ## Build and test
 
-Requires CMake 3.21+ and a C++20 compiler. The test dependency (Catch2) is
-fetched automatically.
+Requires CMake 3.21+ and a C++20 compiler. Catch2 is fetched automatically.
 
 ```bash
-# Configure and build (uses the preset matching your platform)
-cmake --preset windows-msvc
+cmake --preset windows-msvc          # or ci-gcc / ci-clang on Linux
 cmake --build build --config Debug
-
-# Run the tests
 ctest --test-dir build -C Debug --output-on-failure
 ```
 
-On Linux, swap the preset for `ci-gcc` or `ci-clang`, and use the `asan` / `tsan`
-presets to run the suite under sanitizers.
-
-To build and run the benchmarks:
+The `asan` and `tsan` presets run the suite under sanitizers. Benchmarks:
 
 ```bash
 cmake -S . -B build -DSW_RINGBUFFER_BUILD_BENCHMARKS=ON
@@ -144,29 +102,16 @@ cmake --build build --config Release --target sw_benchmarks
 
 ## Benchmarks
 
-`SpscRingBuffer` versus a `std::mutex` + `std::queue` baseline.
+`SpscRingBuffer` versus a `std::mutex` + `std::queue` baseline (16-core x86-64,
+MSVC Release; the ratio matters more than the absolute figures):
 
 | Benchmark | `SpscRingBuffer` | Mutex queue | Speedup |
 |---|---|---|---|
 | Uncontended push + pop | 2.5 ns | 35.3 ns | ~14x |
 | 1M-item two-thread throughput | 7.2 ms | 148 ms | ~20x |
 
-(16-core x86-64, MSVC Release. Run the suite on your own hardware; the point is
-the ratio, not the absolute figures.)
-
-The uncontended gap is the data-structure overhead alone (a masked index and two
-release/acquire stores versus a lock/unlock pair). The throughput gap is even
-larger because the mutex serializes the producer and consumer, while the
-lock-free buffer lets them run genuinely in parallel.
-
-## Status
-
-- [x] `SpscRingBuffer<T>` core with single-threaded test coverage
-- [x] Two-thread stress test (run under the `tsan` preset in CI)
-- [x] `JitterBuffer` (prebuffer + drift)
-- [x] `RedundancyPacketizer` (FEC) with loss/reorder recovery tests
-- [x] Benchmarks vs mutex queue
-- [x] CI matrix (gcc / clang / msvc) and sanitizer job (asan / tsan)
+The throughput gap is the larger one because the mutex serializes the producer
+and consumer, while the lock-free buffer lets them run in parallel.
 
 ## License
 

@@ -1,7 +1,7 @@
 # Design notes
 
-This document explains the reasoning behind `sw::SpscRingBuffer<T>` and records
-what changed relative to the original `SWRingBuffer` it was extracted from.
+This document explains the reasoning behind the design choices in
+`sw::SpscRingBuffer<T>`.
 
 ## The single-writer-per-index rule
 
@@ -67,21 +67,18 @@ be trivially copyable (via a C++20 concept) keeps those copies valid and cheap,
 and matches every audio sample type we care about (`int16_t`, `float`, small POD
 frame structs).
 
-## What changed from the original `SWRingBuffer`
+## Design choices at a glance
 
-The original lives in [`../legacy/`](../legacy/). The most important differences:
-
-| Original `SWRingBuffer` | `sw::SpscRingBuffer<T>` |
+| Choice | Rationale |
 |---|---|
-| `head` advanced from several call sites (append, render, mixer) | One writer per index, enforced by API shape |
-| `head == tail` meant "full" in one place and "empty" in another | Single unambiguous invariant via monotonic counters |
-| `int` indices with `% bufferSize` | `std::size_t` counters with a power-of-two mask |
-| Default `seq_cst` on every atomic op | Explicit, documented `acquire` / `release` (and `relaxed` self-loads) |
-| `head` and `tail` adjacent in one cache line | Padded onto separate cache lines |
-| Manual `new[]` / `delete[]`, copyable by default (double-free risk) | RAII storage, copy and move deleted |
-| `printf` on the audio path | Hot path does no I/O |
-| Specialized to `int16_t`, audio and UDP logic mixed in | Generic core; audio and FEC live in separate layers |
+| One writer per index | Removes any write-write race; each side only reads what the other publishes |
+| `std::size_t` monotonic counters with a power-of-two mask | No modulo, and an unambiguous full / empty test with the whole capacity usable |
+| Explicit `acquire` / `release` (and `relaxed` self-loads) | Exactly the ordering the algorithm needs, no global `seq_cst` overhead |
+| `head` and `tail` on separate cache lines | Avoids false sharing between the producer and consumer cores |
+| RAII storage, copy and move deleted | No manual `new[]` / `delete[]`, no accidental double-free |
+| Hot path does no I/O or allocation | Safe to call from a real-time audio callback |
+| Generic core, audio and FEC in separate layers | The ring stays small and reusable; timing and network logic compose on top |
 
-The audio-specific behavior (prebuffering, drift compensation) and the network
-redundancy packetizer are not lost; they move up into `sw::JitterBuffer` and
-`sw::RedundancyPacketizer`, where they can be tested on their own.
+The audio-specific behavior (prebuffering, drift compensation) lives in
+`sw::JitterBuffer`, and the network redundancy logic in
+`sw::RedundancyPacketizer`, so each can be tested on its own.
