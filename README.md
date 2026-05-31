@@ -1,5 +1,7 @@
 # sw-ringbuffer
 
+[![CI](https://github.com/stagewave-rope/jitter-buffer/actions/workflows/ci.yml/badge.svg)](https://github.com/stagewave-rope/jitter-buffer/actions/workflows/ci.yml)
+
 Header-only C++20 building blocks for moving audio between threads and across a
 lossy network without glitches.
 
@@ -163,7 +165,7 @@ lock-free buffer lets them run genuinely in parallel.
 - [x] `JitterBuffer` (prebuffer + drift)
 - [x] `RedundancyPacketizer` (FEC) with loss/reorder recovery tests
 - [x] Benchmarks vs mutex queue
-- [ ] CI matrix (gcc / clang / msvc) and sanitizer job
+- [x] CI matrix (gcc / clang / msvc) and sanitizer job (asan / tsan)
 
 ## License
 
