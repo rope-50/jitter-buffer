@@ -115,7 +115,9 @@ public:
         // catch up. One dropped block is a far smaller artifact than letting the
         // buffer saturate and overwrite continuously.
         if (fill_ratio() > high_water_) {
-            ring_.read(out); // discard one block into the scratch we are about to overwrite
+            // Discard one block to catch up. We overwrite `out` again below, so
+            // the read here is purely to advance past the dropped block.
+            (void)ring_.read(out);
             action = PlaybackAction::Skipped;
         }
 
@@ -128,7 +130,7 @@ public:
             return PlaybackAction::Underrun;
         }
 
-        ring_.read(out);
+        (void)ring_.read(out);
         return action;
     }
 

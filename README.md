@@ -144,17 +144,18 @@ cmake --build build --config Release --target sw_benchmarks
 
 ## Benchmarks
 
-`SpscRingBuffer` versus a `std::mutex` + `std::queue` baseline. Numbers below are
-from one machine (16-core x86-64, MSVC Release) and are illustrative; run the
-suite on your own hardware. The point is the ratio, not the absolute figures.
+`SpscRingBuffer` versus a `std::mutex` + `std::queue` baseline.
 
 | Benchmark | `SpscRingBuffer` | Mutex queue | Speedup |
 |---|---|---|---|
-| Uncontended push + pop | 7.4 ns | 19.7 ns | ~2.7x |
-| 1M-item two-thread throughput | 2.6 ms | 37.2 ms | ~14x |
+| Uncontended push + pop | 2.5 ns | 35.3 ns | ~14x |
+| 1M-item two-thread throughput | 7.2 ms | 148 ms | ~20x |
+
+(16-core x86-64, MSVC Release. Run the suite on your own hardware; the point is
+the ratio, not the absolute figures.)
 
 The uncontended gap is the data-structure overhead alone (a masked index and two
-release/acquire stores versus a lock/unlock pair). The throughput gap is much
+release/acquire stores versus a lock/unlock pair). The throughput gap is even
 larger because the mutex serializes the producer and consumer, while the
 lock-free buffer lets them run genuinely in parallel.
 
