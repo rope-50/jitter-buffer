@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows MSVC (Visual Studio 2022)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "SW_RINGBUFFER_BUILD_TESTS": "ON" }
+    },
+    {
+      "name": "ci-gcc",
+      "displayName": "Linux GCC",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gcc",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SW_RINGBUFFER_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "ci-clang",
+      "displayName": "Linux Clang",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clang",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SW_RINGBUFFER_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Clang + Address/UB sanitizers",
+      "inherits": "ci-clang",
+      "binaryDir": "${sourceDir}/build/asan",
+      "cacheVariables": { "SW_RINGBUFFER_SANITIZER": "address;undefined" }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Clang + Thread sanitizer",
+      "inherits": "ci-clang",
+      "binaryDir": "${sourceDir}/build/tsan",
+      "cacheVariables": { "SW_RINGBUFFER_SANITIZER": "thread" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-msvc", "configurePreset": "windows-msvc", "configuration": "Debug" },
+    { "name": "ci-gcc", "configurePreset": "ci-gcc" },
+    { "name": "ci-clang", "configurePreset": "ci-clang" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-msvc",
+      "configurePreset": "windows-msvc",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    { "name": "ci-gcc", "configurePreset": "ci-gcc", "output": { "outputOnFailure": true } },
+    { "name": "ci-clang", "configurePreset": "ci-clang", "output": { "outputOnFailure": true } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true } }
+  ]
+}
